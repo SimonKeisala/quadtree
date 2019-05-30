@@ -7,12 +7,11 @@ import math
 #   points in the tree.
 #
 #    What's included:
-#      * A general object of storing points and data linked to the
-#          points
+#      * A general class able to store points with corresponding data
 #      * Simple querying of regions within the object.
 #         Region types:
-#           - Circular region
-#           - Rectangular region
+#           - Circular regions
+#           - Rectangular regions
 #
 #    How to use:
 #      1. Start by creating a Tree object:
@@ -49,7 +48,6 @@ import math
 #     move.
 #     To speed up the queries, separate static objects and dynamic
 #     objects into two trees and perform a query on both trees.
-#
 
 
 class Tree:
@@ -125,8 +123,6 @@ class Tree:
             # Otherwise get the child where point should fit in:
             curr = curr.__querychild(point)
 
-        return False
-
     #######################################################
     # queryCircle:
     #    Creates a query of a circular region within the quadtree
@@ -190,6 +186,14 @@ class Tree:
     # End of debugging functions
     ######################################################
 
+
+
+
+    ######################################################
+    #
+    # Internal classes and functions, not instantiated by the user
+    #
+    ######################################################
     # Internal function to query the matching child region
     # or to create a new child region if it does not exist
     def __querychild(self, point):
@@ -223,7 +227,7 @@ class Tree:
         return child
 
 
-    # Internal class to handle the rule of a circular query
+    # Class to handle the rule of a circular query
     class __circleRule:
         def __init__(self, x, y, r):
             self.__x = float(x)
@@ -241,7 +245,7 @@ class Tree:
             print("dx:",dX, "dy:",dY)
             return dX*dX + dY*dY < self.__r*self.__r
 
-    # Internal class to handle the rule of a rectangular query
+    # Class to handle the rule of a rectangular query
     class __rectRule:
         def __init__(self, rectangle):
             self.__rectangle = rectangle
@@ -252,7 +256,7 @@ class Tree:
         def validRegion(self, region):
             return self.__rectangle.overlapRectangle(region.rectangle)
 
-    # Internal class of rectangle representation
+    # Class of rectangle representation
     class __Rectangle:
         def __init__(self, top, right, bottom, left):
             self.top    = float(top)
@@ -288,7 +292,8 @@ class Tree:
                 ( self.left == other.left and \
                   self.bottom < other.bottom )
 
-    # Internal class of a query object
+    # Class of a query object, returned when calling queryCircle or
+    # queryRect
     class __Query:
         def __init__(self, region, rule):
             self.__regions = [region]
@@ -322,6 +327,9 @@ class Tree:
                 self.__index = 0
             return None
 
+        # Returns a list of all objects matching the given query. If
+        # the objects is processed one at a time it is faster to run
+        # next() instead of all()
         def all(self):
             result = []
             item = self.next()
@@ -330,6 +338,7 @@ class Tree:
                 item = self.next()
             return result
 
+        # Lists some summary of the current query
         def summary(self):
             print("Regions checked:", self.__regions_checked)
             print("Points checked:", self.__points_checked)
