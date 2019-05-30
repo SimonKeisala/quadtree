@@ -221,7 +221,7 @@ class Tree:
         child = Tree(left   = left,   right = left   + w, \
                      bottom = bottom, top   = bottom + h, \
                      capacity = self.__capacity, \
-                     branchingFactor = self.__branchingFactor
+                     branchingFactor = self.__branchingFactor,\
                      checkPower = False)
         self.children.append(child)
         return child
