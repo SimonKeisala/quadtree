@@ -237,12 +237,11 @@ class Tree:
         def validPoint(self, point):
             dx = point[0] - self.__x
             dy = point[1] - self.__y
-            return dx*dx+dy*dy <= self.__r*self.__r + 0.001
+            return dx*dx+dy*dy <= self.__r*self.__r
 
         def validRegion(self, region):
             dX = min(0,self.__x - region.rectangle.left)   + max(0,self.__x - region.rectangle.right)
             dY = min(0,self.__y - region.rectangle.bottom) + max(0,self.__y - region.rectangle.top)
-            print("dx:",dX, "dy:",dY)
             return dX*dX + dY*dY < self.__r*self.__r
 
     # Class to handle the rule of a rectangular query
