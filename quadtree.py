@@ -327,7 +327,7 @@ class Tree:
             return None
 
         # Returns a list of all objects matching the given query. If
-        # the objects is processed one at a time it is faster to run
+        # the objects are processed one at a time it is faster to run
         # next() instead of all()
         def all(self):
             result = []
@@ -349,7 +349,6 @@ class Tree:
 
 # Helper function to get the nearest power of two (rounded down) from a given value
 def __powerOfTwo(val):
-    # Convert to integer
     # check if zero
     if val == 0:
         return 0
