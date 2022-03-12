@@ -50,7 +50,7 @@ class Tree:
         self._capacity = capacity
         self.region = Region(center, self._size)
         self.parent = None
-        self.children = []
+        self.children = None
         self.points = []
         self.totalPoints = 0
 
@@ -66,7 +66,9 @@ class Tree:
         # Check if point actually is in region
         if not self.region.overlap_point(point):
             return False
+        return self._insert(obj, point)
 
+    def _insert(self, obj, point):
         # If it is in region it should fit in the root or one child
         self.totalPoints += 1
 
@@ -77,8 +79,7 @@ class Tree:
 
         # Otherwise get the child branch where point should fit in:
         child = self._get_child(point)
-        child.parent = self
-        return child.insert(obj, point)
+        return child._insert(obj, point)
 
     def query_circle(self, point, r):
         """Creates a generator query of a circular region within the quadtree.
@@ -93,8 +94,9 @@ class Tree:
             for obj, pt in self.points:
                 if numpy.sum((point-pt)**2) < r2:
                     yield obj, pt
-            for c in self.children:
-                yield from c.query_circle(point, r)
+            if self.children:
+                for c in self.children:
+                    yield from c.query_circle(point, r)
 
     def query_rect(self, point, rect):
         """Creates a generator query of a rectangular region within the quadtree.
@@ -113,26 +115,31 @@ class Tree:
                 yield from c.query_rect(point, rect)
 
     def __iter__(self):
+        """Iterates through all the objects in the quadtree."""
         for obj, pt in self.points:
             yield obj, pt
         for c in self.children:
             yield from c
 
-    def _get_child(self, point):
+    def _get_child(self, point) -> "Tree":
         """
-        Internal function that queries the matching child region
-        or creates a new child region if it does not exist.
+        Internal function that queries the matching child region.
+        If the child regions has not yet been created it firsts create all the child regions.
         """
+        if not self.children:
+            half_size = self.region.shape / 2
+            polarity = 2**numpy.arange(self.region.dimensions)
+            self.children = []
+            for i in range(2 ** self.region.dimensions):
+                mult = (i // polarity % 2) * 2 - 1
+                center = self.region.center+half_size*mult
+                child = Tree(center, half_size)
+                child.parent = self
+                self.children.append(child)
+            self.range = 2**numpy.arange(2)
 
-        # First see if any of the existing child is a match
-        for child in self.children:
-            if child.region.overlap_point(point):
-                return child
-
-        signs = numpy.sign(point-self.region.center)
-        signs[signs == 0] = 1
-        child_center = self.region.center+(signs*self._size/2)
-
-        child = Tree(child_center, self._size/2)
-        self.children.append(child)
-        return child
+        index = 0
+        for i in range(len(self.region.center)):
+            if self.region.center[i] < point[i]:
+                index += 2**i
+        return self.children[index]

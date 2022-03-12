@@ -56,12 +56,7 @@ class Region:
         try:
             return (
                     len(numpy.atleast_1d(point)) == self.dimensions and
-                    numpy.max(
-                        numpy.subtract(
-                            numpy.abs(
-                                numpy.subtract(numpy.atleast_1d(point), self.center)),
-                            self.shape)
-                    ) <= 0
+                    numpy.max(numpy.abs(numpy.atleast_1d(point) - self.center) - self.shape) <= 0
             )
         except:  # noqa: Ignore any exception
             return False
