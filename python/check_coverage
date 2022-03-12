@@ -1,5 +1,0 @@
-#!/bin/bash
-
-coverage run --source=. ./test_executor.py
-coverage report -m
-
