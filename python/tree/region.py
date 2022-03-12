@@ -19,7 +19,7 @@ def shape_check(size, dimensions):
     if any(x <= 0 for x in size):
         raise RegionInvalid("Shape dimension size must be non-zero")
     elif len(size) == 1:
-        return numpy.array([size]*dimensions)
+        return numpy.repeat(size,dimensions)
     elif len(size) == dimensions:
         return size
     else:
@@ -62,6 +62,20 @@ class Region:
                                 numpy.subtract(numpy.atleast_1d(point), self.center)),
                             self.shape)
                     ) <= 0
+            )
+        except:  # noqa: Ignore any exception
+            return False
+
+    def overlap_circle(self, point, r):
+        try:
+            return (
+                    len(numpy.atleast_1d(point)) == self.dimensions and
+                    numpy.max(
+                        numpy.subtract(
+                            numpy.abs(
+                                numpy.subtract(numpy.atleast_1d(point), self.center)),
+                            self.shape)
+                    ) <= r
             )
         except:  # noqa: Ignore any exception
             return False

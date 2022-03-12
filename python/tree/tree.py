@@ -87,10 +87,11 @@ class Tree:
         :param r:     radius of circle
         :return: Generator object corresponding to the query
         """
+        r2 = r*r
         point = numpy.atleast_1d(point)
-        if self.region.overlap_point(point):
+        if self.region.overlap_circle(point, r):
             for obj, pt in self.points:
-                if numpy.sqrt(numpy.sum((point-pt)**2)) < r:
+                if numpy.sum((point-pt)**2) < r2:
                     yield obj, pt
             for c in self.children:
                 yield from c.query_circle(point, r)
@@ -104,7 +105,7 @@ class Tree:
         """
         point = numpy.atleast_1d(point)
         rect = shape_check(rect, self.region.dimensions)
-        if self.region.overlap_point(point):
+        if self.region.overlap_region(point, rect):
             for obj, pt in self.points:
                 if numpy.max(numpy.abs(point-pt)-rect) < 0:
                     yield obj, pt
