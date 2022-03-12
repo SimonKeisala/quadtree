@@ -112,6 +112,12 @@ class Tree:
             for c in self.children:
                 yield from c.query_rect(point, rect)
 
+    def __iter__(self):
+        for obj, pt in self.points:
+            yield obj, pt
+        for c in self.children:
+            yield from c
+
     def _get_child(self, point):
         """
         Internal function that queries the matching child region
