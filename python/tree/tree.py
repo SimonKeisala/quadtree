@@ -1,7 +1,14 @@
 import numpy
 from typing import Tuple
 
-from tree.region import Region, shape_check
+from tree.region import Region
+
+
+def shape(size, dimensions):
+    size = numpy.atleast_1d(size)
+    if len(size) == 1:
+        return numpy.repeat(size, dimensions)
+    return size
 
 
 class Tree:
@@ -46,9 +53,10 @@ class Tree:
                        positive and negative)
           :param capacity: Capacity of each sub-tree (default: 10)
         """
-        self._size = abs(size)
+        self._size = size
         self._capacity = capacity
-        self.region = Region(center, self._size)
+        self._dimensions = len(center)
+        self.region = Region(center, shape(self._size, self._dimensions))
         self.parent = None
         self.children = None
         self.points = []
@@ -64,7 +72,7 @@ class Tree:
         example: insert((0.1, 0.5), myObject)
         """
         # Check if point actually is in region
-        if not self.region.overlap_point(point):
+        if not self.region.point_inside(point):
             return False
         return self._insert(obj, point)
 
@@ -81,45 +89,36 @@ class Tree:
         child = self._get_child(point)
         return child._insert(obj, point)
 
-    def query_circle(self, point, r):
-        """Creates a generator query of a circular region within the quadtree.
-
-        :param point: tuple of point in tree
-        :param r:     radius of circle
-        :return: Generator object corresponding to the query
-        """
-        r2 = r*r
-        point = numpy.atleast_1d(point)
-        if self.region.overlap_circle(point, r):
-            for obj, pt in self.points:
-                if numpy.sum((point-pt)**2) < r2:
-                    yield obj, pt
-            if self.children:
-                for c in self.children:
-                    yield from c.query_circle(point, r)
-
-    def query_rect(self, point, rect):
+    def intersect(self, center, rect):
         """Creates a generator query of a rectangular region within the quadtree.
 
-        :param point: tuple of point in tree
+        :param center: tuple of center point in tree
         :param rect: rectangle to extract
         :return: generator object corresponding to the query
         """
-        point = numpy.atleast_1d(point)
-        rect = shape_check(rect, self.region.dimensions)
-        if self.region.overlap_region(point, rect):
-            for obj, pt in self.points:
-                if numpy.max(numpy.abs(point-pt)-rect) < 0:
-                    yield obj, pt
-            for c in self.children:
-                yield from c.query_rect(point, rect)
+        center = numpy.atleast_1d(center)
+        rect = shape(rect, self._dimensions)
+        yield from self._query_rect(center, rect)
+
+    def _query_rect(self, center, rect):
+        if self.region.intersects(center, rect):
+            if self.region.contains(center, rect):
+                yield from self
+            else:
+                if self.children:
+                    for c in self.children:
+                        yield from c._query_rect(center, rect)
+                for obj, pt in self.points:
+                    if not any(numpy.abs(center-pt)-rect > 0):
+                        yield obj
 
     def __iter__(self):
         """Iterates through all the objects in the quadtree."""
-        for obj, pt in self.points:
-            yield obj, pt
-        for c in self.children:
-            yield from c
+        if self.children:
+            for c in self.children:
+                yield from c
+        for obj, _ in self.points:
+            yield obj
 
     def _get_child(self, point) -> "Tree":
         """
@@ -127,13 +126,14 @@ class Tree:
         If the child regions has not yet been created it firsts create all the child regions.
         """
         if not self.children:
-            half_size = self.region.shape / 2
-            polarity = 2**numpy.arange(self.region.dimensions)
+            size2 = self._size / 2
+            size4 = self.region.shape / 4
+            polarity = 2**numpy.arange(self._dimensions)
             self.children = []
-            for i in range(2 ** self.region.dimensions):
+            for i in range(2 ** self._dimensions):
                 mult = (i // polarity % 2) * 2 - 1
-                center = self.region.center+half_size*mult
-                child = Tree(center, half_size)
+                center = self.region.center+size4*mult
+                child = Tree(center, size2)
                 child.parent = self
                 self.children.append(child)
             self.range = 2**numpy.arange(2)
