@@ -1,1 +1,2 @@
-from .tree import Tree as Tree
+from .tree import Tree
+from .quadtree import Quadtree

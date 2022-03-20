@@ -2,100 +2,98 @@ import random
 import time
 
 import numpy as np
-import pygame
 import tree
 import quads
 import gaphas.quadtree
 import pyqtree
-
-RADIUS = 20
+import matplotlib.pyplot as plt
 
 
 def main():
+    """Benchmarking of own implementation and three different libraries.
+
+    The benchmarking will compare the duration of inserting objects as well as framerate
+    of querying all objects within a region."""
+
+    # Create the sample points to use for all libraries
     items = []
     random.seed(1234)
-    gaphas_tree = gaphas.quadtree.Quadtree()
-    quads_tree = quads.QuadTree((256, 256), 512, 512)
-    pyqtree_tree = pyqtree.Index(bbox=(0, 0, 512, 512))
-    tree_tree = tree.Tree((256, 256), 512)
     for i in range(100000):
-        x = (random.random()) * 512
-        y = (random.random()) * 512
+        x = (random.random()) * 500
+        y = (random.random()) * 500
         items.append((i, (x, y)))
 
-    start = time.time()
-    for i, pt in items:
-        gaphas_tree.add((i, pt), (*pt, 1, 1))
-    gaphas_time = time.time() - start
-    print(f"gaphas_time: {gaphas_time:.2f}")
-    start = time.time()
-    for i, pt in items:
-        quads_tree.insert(pt, data=(i, pt))
-    quads_time = time.time() - start
-    print(f"quads_time: {quads_time:.2f}")
-    start = time.time()
-    for i, (x, y) in items:
-        pyqtree_tree.insert((i, (x, y)),
-                            bbox=(x, y, x, y))
-    pyqtree_time = time.time() - start
-    print(f"pyqtree_time: {pyqtree_time:.2f}")
-    start = time.time()
-    for i, pt in items:
-        tree_tree.insert((i, pt), pt)
-    tree_time = time.time() - start
-    print(f"tree_time: {tree_time:.2f}")
+    # Instantiate all libraries
+    gaphas_tree = gaphas.quadtree.Quadtree()
+    quads_tree = quads.QuadTree((250, 250), 500, 500)
+    pyqtree_tree = pyqtree.Index(bbox=(0, 0, 500, 500))
+    tree_quad_tree = tree.Quadtree((0, 0, 500, 500))
+    tree_tree = tree.Tree((250,250), 500)
 
-    intersects = {
-        "pyqtree_tree": lambda pos, r: pyqtree_tree.intersect(np.concatenate([pos-r, pos+r])),
-        "tree_tree": lambda pos, r: tree_tree.intersect(pos, r),
-        "gaphas_tree": lambda pos, r: gaphas_tree.find_intersect(np.concatenate([pos-r, pos-pos+r+r])),
-        "quads_tree": lambda pos, r: quads_tree.within_bb(quads.BoundingBox(*(pos-r), *(pos+r)))
+    # Map common functions for inserting, perform intersection and extracting the intersected data
+    insert = {
+        "pyqtree": lambda item, pos: pyqtree_tree.insert((item, pos), bbox=(*pos, pos[0], pos[1])),
+        "tree_quadtree": lambda item, pos: tree_quad_tree.insert((item, pos), (*pos, pos[0], pos[1])),
+        #"tree_tree": lambda item, pos: tree_tree.insert((item, pos), pos),
+        "gaphas": lambda item, pos: gaphas_tree.add((item, pos), [*pos, 0, 0]),
+        #"quads": lambda item, pos: quads_tree.insert(pos, data=(item, pos)),
+    }
+    intersect = {
+        "pyqtree": lambda pos, r: pyqtree_tree.intersect(np.concatenate([pos-r, pos+r])),
+        "tree_quadtree": lambda pos, r: tree_quad_tree.intersect(*(pos - r), *(pos + r)),
+        #"tree_tree": lambda pos, r: tree_tree.intersect(pos, r),
+        "gaphas": lambda pos, r: gaphas_tree.find_intersect(np.concatenate([pos-r, pos-pos+r+r])),
+        #"quads": lambda pos, r: quads_tree.within_bb(quads.BoundingBox(*(pos-r), *(pos+r)))
     }
     extract = {
-        "pyqtree_tree": lambda data: data,
-        "tree_tree": lambda data: data,
-        "gaphas_tree": lambda data: data,
-        "quads_tree": lambda data: data.data,
+        "pyqtree": lambda data: data,
+        "tree_quadtree": lambda data: data,
+        #"tree_tree": lambda data: data,
+        "gaphas": lambda data: data,
+        #"quads": lambda data: data.data,
     }
+    for method in insert:
+        start = time.time()
+        for i, pt in items:
+            insert[method](i, pt)
+        end = time.time()
+        print(f"{method}: {end-start:.2f}s")
 
-
-    pygame.init()
-    screen = pygame.display.set_mode([500, 500])
-    running = True
     frames = 0
-    last_measure = time.time()
-    mouse_pos = np.zeros(2)
-    r_squared = RADIUS * RADIUS
-    methods = [x for x in intersects]
-    method_idx = 0
-    items_found = 0
-    while running:
-        frames += 1
-        if time.time() - last_measure > 1:
-            last_measure += 1
-            print(f"{methods[method_idx]}:{frames}")
-            print(f"items found: {items_found}\n")
+    mouse_pos = np.array([250, 250])
+    measure_duration = .1
+    r = 2.5
+    while r <= 255:
+        counts = {}
+        for name, method in intersect.items():
+            counts[name] = len([extract[name](item) for item in intersect[name](mouse_pos, r)])
+        last_value = -1
+        last_key = None
+        for key, value in counts.items():
+            if last_key and value != last_value:
+                print(f"Difference between: {last_key} and {key}: {last_value} -- {value}")
+            last_key = key
+            last_value = value
+        r += 2.5
 
-            frames = 0
-            method_idx = (method_idx+1) % len(methods)
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            elif event.type == pygame.MOUSEMOTION:
-                mouse_pos = np.array(event.pos)
-
-        #mouse_pos = np.array([256, 256])
-        screen.fill((255, 255, 255))
-        found_items = [x for x in intersects[methods[method_idx]](mouse_pos, RADIUS)]
-        items_found = len(found_items)
-        for item in found_items:
-            data = extract[methods[method_idx]](item)
-            pygame.draw.circle(screen, (255, 0, 0), data[1], 1)
-        #for item, point in items:
-        #    if np.sum((mouse_pos - point) ** 2) < r_squared:
-        #        pygame.draw.circle(screen, (255, 0, 0), point, 1)
-
-        pygame.display.flip()
+    for name, method in intersect.items():
+        r = 2.5
+        last_measure = time.time()
+        radius = []
+        framerate = []
+        while r <= 255:
+            frames += 1
+            delta = time.time() - last_measure
+            result = [extract[name](item) for item in intersect[name](mouse_pos, r)]
+            if delta > measure_duration:
+                radius.append(r)
+                framerate.append(frames/delta)
+                frames = 0
+                r += 2.5
+                last_measure += delta
+        plt.plot(radius, framerate)
+    plt.legend([name for name in intersect])
+    plt.show()
 
 
 if __name__ == "__main__":

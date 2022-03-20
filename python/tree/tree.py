@@ -12,7 +12,7 @@ def shape(size, dimensions):
 
 
 class Tree:
-    """ Class for storing points in a region and for quick query of the points in the tree.
+    """ Class for storing points in a region and for quick querying of the points in the tree.
 
         What's included:
           * A general class able to store points with corresponding data
@@ -60,7 +60,6 @@ class Tree:
         self.parent = None
         self.children = None
         self.points = []
-        self.totalPoints = 0
 
     def insert(self, obj, point):
         """Insert a point into the quadtree.
@@ -74,20 +73,22 @@ class Tree:
         # Check if point actually is in region
         if not self.region.point_inside(point):
             return False
-        return self._insert(obj, point)
+        self._insert(obj, point)
+        return True
 
     def _insert(self, obj, point):
-        # If it is in region it should fit in the root or one child
-        self.totalPoints += 1
-
         # Check if current region have space for new point
-        if len(self.points) < self._capacity:
-            self.points.append((obj, numpy.atleast_1d(point)))
-            return True
-
-        # Otherwise get the child branch where point should fit in:
-        child = self._get_child(point)
-        return child._insert(obj, point)
+        if self.children:
+            self._get_child(point)._insert(obj, point)
+        else:
+            if len(self.points) == self._capacity:
+                self._create_children()
+                for i, p in self.points:
+                    self._get_child(p)._insert(i, p)
+                self.points = []
+                self._get_child(point)._insert(obj, point)
+            else:
+                self.points.append((obj, numpy.atleast_1d(point)))
 
     def intersect(self, center, rect):
         """Creates a generator query of a rectangular region within the quadtree.
@@ -108,38 +109,35 @@ class Tree:
                 if self.children:
                     for c in self.children:
                         yield from c._query_rect(center, rect)
-                for obj, pt in self.points:
-                    if not any(numpy.abs(center-pt)-rect > 0):
-                        yield obj
+                else:
+                    for obj, pt in self.points:
+                        if not any(numpy.abs(center-pt)-rect > 0):
+                            yield obj
 
     def __iter__(self):
         """Iterates through all the objects in the quadtree."""
         if self.children:
             for c in self.children:
                 yield from c
-        for obj, _ in self.points:
-            yield obj
+        else:
+            for obj, _ in self.points:
+                yield obj
 
     def _get_child(self, point) -> "Tree":
-        """
-        Internal function that queries the matching child region.
-        If the child regions has not yet been created it firsts create all the child regions.
-        """
-        if not self.children:
-            size2 = self._size / 2
-            size4 = self.region.shape / 4
-            polarity = 2**numpy.arange(self._dimensions)
-            self.children = []
-            for i in range(2 ** self._dimensions):
-                mult = (i // polarity % 2) * 2 - 1
-                center = self.region.center+size4*mult
-                child = Tree(center, size2)
-                child.parent = self
-                self.children.append(child)
-            self.range = 2**numpy.arange(2)
-
         index = 0
         for i in range(len(self.region.center)):
             if self.region.center[i] < point[i]:
                 index += 2**i
         return self.children[index]
+
+    def _create_children(self):
+        size2 = self._size / 2
+        size4 = self.region.shape / 4
+        polarity = 2 ** numpy.arange(self._dimensions)
+        self.children = []
+        for i in range(2 ** self._dimensions):
+            mult = (i // polarity % 2) * 2 - 1
+            center = self.region.center + size4 * mult
+            child = Tree(center, size2)
+            child.parent = self
+            self.children.append(child)

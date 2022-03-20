@@ -4,17 +4,21 @@ import time
 import numpy as np
 import pygame
 
-from tree import Tree
+from tree import Tree, Quadtree
 
 RADIUS = 20
 
 
 def main():
-    quadtree = Tree((256, 256))
-    for i in range(20000):
+    quadtree = Quadtree((0, 0, 512, 512))
+    random.seed(1234)
+    start = time.time()
+    for i in range(10000):
         x = (random.random()) * 512
         y = (random.random()) * 512
-        quadtree.insert(i, (x, y))
+        quadtree.insert((i, (x, y)), (x, y, x, y))
+    end = time.time()
+    print(end-start)
 
     pygame.init()
     screen = pygame.display.set_mode([500, 500])
@@ -33,10 +37,17 @@ def main():
                 running = False
             elif event.type == pygame.MOUSEMOTION:
                 mouse_pos = np.array(event.pos)
+        radius = time.time()*20 % 350
 
+        #mouse_pos = np.array([256, 256])
         screen.fill((255, 255, 255))
-        for item, point in quadtree.query_circle(mouse_pos, RADIUS):
+        item_count = 0
+        for item, point in quadtree.intersect(*(mouse_pos - radius), *(mouse_pos + radius)):
+            item_count += 1
             pygame.draw.circle(screen, (255, 0, 0), point, 1)
+            pass
+
+        print(item_count)
 
         pygame.display.flip()
 
