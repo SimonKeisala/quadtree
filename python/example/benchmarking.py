@@ -8,12 +8,12 @@ import gaphas.quadtree
 import pyqtree
 import matplotlib.pyplot as plt
 
-INSERTION_BENCHMARKING_TIME = 5  # How many seconds to insert items for each algorithm
+INSERTION_BENCHMARKING_TIME = 10  # How many seconds to insert items for each algorithm
 INSERTION_MEASUREMENTS = 100
 
-INTERSECT_ITEMS = 10000
-INTERSECT_MEASUREMENTS = 20
-INTERSECT_MEASURE_TIME = 0.1
+INTERSECT_ITEMS = 100000
+INTERSECT_MEASUREMENTS = 50
+INTERSECT_MEASURE_TIME = 0.2
 
 
 class PyQtreeWrapper:
