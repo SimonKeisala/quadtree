@@ -2,11 +2,144 @@ import random
 import time
 
 import numpy as np
-import tree
+from tree import Tree
 import quads
 import gaphas.quadtree
 import pyqtree
 import matplotlib.pyplot as plt
+
+INSERTION_BENCHMARKING_TIME = 5  # How many seconds to insert items for each algorithm
+INSERTION_MEASUREMENTS = 100
+
+INTERSECT_ITEMS = 10000
+INTERSECT_MEASUREMENTS = 20
+INTERSECT_MEASURE_TIME = 0.1
+
+
+class PyQtreeWrapper:
+    def __init__(self):
+        self.tree = pyqtree.Index(bbox=(0, 0, 1, 1))
+        self.name = "pyqtree"
+
+    def insert(self, item, pos):
+        self.tree.insert((item, pos), bbox=(*pos, pos[0], pos[1])),
+
+    def intersect(self, pos, r):
+        return [x for x in self.tree.intersect(np.concatenate([pos - r, pos + r]))]
+
+
+class TreeWrapper:
+    def __init__(self):
+        self.tree = Tree((0, 0, 1, 1))
+        self.name = "tree"
+
+    def insert(self, item, pos):
+        self.tree.insert((item, pos), [*pos, *pos])
+
+    def intersect(self, pos, r):
+        return [x for x in self.tree.intersect([*(pos - r), *(pos + r)])]
+
+
+class GaphasWrapper:
+    def __init__(self):
+        self.tree = gaphas.quadtree.Quadtree()
+        self.name = "gaphas"
+
+    def insert(self, item, pos):
+        self.tree.add((item, pos), [*pos, 0, 0]),
+
+    def intersect(self, pos, r):
+        return [x for x in self.tree.find_intersect(np.concatenate([pos - r, pos - pos + r + r]))]
+
+
+class QuadsWrapper:
+    def __init__(self):
+        self.tree = quads.QuadTree((0.5, 0.5), 1, 1)
+        self.name = "quads"
+
+    def insert(self, item, pos):
+        self.tree.insert(pos, data=(item, pos)),
+
+    def intersect(self, pos, r):
+        return [x.data for x in self.tree.within_bb(quads.BoundingBox(*(pos - r), *(pos + r)))]
+
+
+def insertion_test():
+    methods = [
+        PyQtreeWrapper(),
+        TreeWrapper(),
+        QuadsWrapper(),
+        GaphasWrapper(),
+    ]
+
+    insertions_between_each_check = 100
+    time_between_each_measure = INSERTION_BENCHMARKING_TIME / INSERTION_MEASUREMENTS
+    plt.figure(0)
+
+    for method in methods:
+        random.seed(1234)
+        print(f"Benchmarking insertion for {method.name}.")
+        start_time = time.time()
+        measure = 1
+        count = 0
+        X = []
+        Y = []
+        while measure <= INSERTION_MEASUREMENTS:
+            for i in range(insertions_between_each_check):
+                x = (random.random())
+                y = (random.random())
+                method.insert(count, (x, y))
+                count += 1
+            current_time = time.time()
+            if current_time - start_time > time_between_each_measure * measure:
+                X.append(current_time-start_time)
+                Y.append(count)
+                measure += 1
+        plt.plot(X, Y)
+    plt.legend([x.name for x in methods])
+    plt.xlabel("Seconds")
+    plt.ylabel("Insertions")
+
+
+def intersect_test():
+    methods = [
+        PyQtreeWrapper(),
+        TreeWrapper(),
+        QuadsWrapper(),
+        GaphasWrapper(),
+    ]
+
+    random.seed(1234)
+    for i in range(INTERSECT_ITEMS):
+        x = (random.random())
+        y = (random.random())
+        for method in methods:
+            method.insert(i, (x, y))
+    plt.figure(1)
+
+    center = np.array([.5, .5])
+    num_items_found = {}
+    for method in methods:
+        print(f"Benchmarking intersection for {method.name}...")
+        radius = []
+        framerate = []
+        items_found = []
+        for i in range(1, INTERSECT_MEASUREMENTS + 1):
+            r = i / INTERSECT_MEASUREMENTS
+            count = 0
+            start_time = time.time()
+            while time.time() - start_time < INTERSECT_MEASURE_TIME:
+                count += 1
+                items = method.intersect(center, r / 2)
+                if count == 1:
+                    items_found.append(len(items))
+            framerate.append(count/(time.time()-start_time))
+            radius.append(r)
+        num_items_found[method.name] = items_found
+        plt.plot(radius, framerate)
+    plt.legend([x.name for x in methods])
+    plt.xlabel("Query region size")
+    plt.ylabel("Framerate")
 
 
 def main():
@@ -15,84 +148,10 @@ def main():
     The benchmarking will compare the duration of inserting objects as well as framerate
     of querying all objects within a region."""
 
-    # Create the sample points to use for all libraries
-    items = []
-    random.seed(1234)
-    for i in range(100000):
-        x = (random.random()) * 500
-        y = (random.random()) * 500
-        items.append((i, (x, y)))
-
-    # Instantiate all libraries
-    gaphas_tree = gaphas.quadtree.Quadtree()
-    quads_tree = quads.QuadTree((250, 250), 500, 500)
-    pyqtree_tree = pyqtree.Index(bbox=(0, 0, 500, 500))
-    tree_quad_tree = tree.Quadtree((0, 0, 500, 500))
-    tree_tree = tree.Tree((250,250), 500)
-
-    # Map common functions for inserting, perform intersection and extracting the intersected data
-    insert = {
-        "pyqtree": lambda item, pos: pyqtree_tree.insert((item, pos), bbox=(*pos, pos[0], pos[1])),
-        "tree_quadtree": lambda item, pos: tree_quad_tree.insert((item, pos), (*pos, pos[0], pos[1])),
-        #"tree_tree": lambda item, pos: tree_tree.insert((item, pos), pos),
-        "gaphas": lambda item, pos: gaphas_tree.add((item, pos), [*pos, 0, 0]),
-        #"quads": lambda item, pos: quads_tree.insert(pos, data=(item, pos)),
-    }
-    intersect = {
-        "pyqtree": lambda pos, r: pyqtree_tree.intersect(np.concatenate([pos-r, pos+r])),
-        "tree_quadtree": lambda pos, r: tree_quad_tree.intersect(*(pos - r), *(pos + r)),
-        #"tree_tree": lambda pos, r: tree_tree.intersect(pos, r),
-        "gaphas": lambda pos, r: gaphas_tree.find_intersect(np.concatenate([pos-r, pos-pos+r+r])),
-        #"quads": lambda pos, r: quads_tree.within_bb(quads.BoundingBox(*(pos-r), *(pos+r)))
-    }
-    extract = {
-        "pyqtree": lambda data: data,
-        "tree_quadtree": lambda data: data,
-        #"tree_tree": lambda data: data,
-        "gaphas": lambda data: data,
-        #"quads": lambda data: data.data,
-    }
-    for method in insert:
-        start = time.time()
-        for i, pt in items:
-            insert[method](i, pt)
-        end = time.time()
-        print(f"{method}: {end-start:.2f}s")
-
-    frames = 0
-    mouse_pos = np.array([250, 250])
-    measure_duration = .1
-    r = 2.5
-    while r <= 255:
-        counts = {}
-        for name, method in intersect.items():
-            counts[name] = len([extract[name](item) for item in intersect[name](mouse_pos, r)])
-        last_value = -1
-        last_key = None
-        for key, value in counts.items():
-            if last_key and value != last_value:
-                print(f"Difference between: {last_key} and {key}: {last_value} -- {value}")
-            last_key = key
-            last_value = value
-        r += 2.5
-
-    for name, method in intersect.items():
-        r = 2.5
-        last_measure = time.time()
-        radius = []
-        framerate = []
-        while r <= 255:
-            frames += 1
-            delta = time.time() - last_measure
-            result = [extract[name](item) for item in intersect[name](mouse_pos, r)]
-            if delta > measure_duration:
-                radius.append(r)
-                framerate.append(frames/delta)
-                frames = 0
-                r += 2.5
-                last_measure += delta
-        plt.plot(radius, framerate)
-    plt.legend([name for name in intersect])
+    print("Benchmarking insertion")
+    insertion_test()
+    print("Benchmarking intersection")
+    intersect_test()
     plt.show()
 
 

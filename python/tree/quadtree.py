@@ -20,7 +20,7 @@ class Quadtree:
             return False
         self._insert(item, point)
 
-    def intersect(self, x1, y1, x2, y2):
+    def intersect(self, bbox):
         """Creates a generator query of a rectangular region within the quadtree.
 
         :param x: Start x position
@@ -29,7 +29,6 @@ class Quadtree:
         :param height: Height of region
         :return: generator object corresponding to the query
         """
-        bbox = (x1, y1, x2, y2)
         if self._rect_overlap(self.bbox, bbox):
             yield from self._query_rect(bbox, set())
 
@@ -118,8 +117,8 @@ class Quadtree:
     @staticmethod
     def _rect_overlap(bbox1, bbox2):
         return (bbox1[0] <= bbox2[2] and
-                bbox1[2] >= bbox2[0] and
                 bbox1[1] <= bbox2[3] and
+                bbox1[2] >= bbox2[0] and
                 bbox1[3] >= bbox2[1])
 
     @staticmethod
